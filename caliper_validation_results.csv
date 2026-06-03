@@ -1,0 +1,10 @@
+test,status,measured,expected,error,extra,note
+"single vertical edge","PASS",100.3492,100.3500,-0.0008,1.0000,"baseline absolute x error; extra=edge count"
+"forward/reverse valid endpoints","PASS",100.3492,100.3492,0.0000,1.0000,"forward/reverse global x mismatch; extra=reverse edge count"
+"forward/reverse with p2=image.cols","PASS",100.3492,100.3492,0.0000,1.0000,"border endpoint reversibility check; extra=reverse edge count"
+"subpixel shift along scan","PASS",0.0013,0.0000,0.0013,100.3499,"measured is peak-to-peak global-x jitter over +/-0.45 px; extra=mean x"
+"perpendicular shift on vertical edge","PASS",0.0000,0.0000,0.0000,100.3492,"vertical ideal edge should not move when caliper shifts in y"
+"slanted edge y-shift geometry","INFO",4.2872,0.0000,0.0004,15.0000,"on a 15 degree edge, moving y changes the true x-intersection; extra=edge angle deg"
+"two-edge bright stripe","PASS",70.5000,70.5000,-0.0000,2.0000,"expects rising then falling edge; extra=edge count"
+"edge near profile end","PASS",218.5000,218.5000,0.0000,1.0000,"detects whether trailing threshold segment is flushed; extra=edge count"
+"width 20 vs 21 effective samples","PASS",20.0000,21.0000,-1.0000,0.0000,"fixed code uses exactly width samples"
