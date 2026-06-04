@@ -1,0 +1,6 @@
+image_path,tool_name,status,edge_count,x_px,y_px,position_px,value_mm,gradient,message
+"C:/Users/Giraffe/Downloads/2DMeasure-main/batch_test_data/reference.png","Template Locator",OK,0,,,,,,"OK"
+"C:/Users/Giraffe/Downloads/2DMeasure-main/batch_test_data/reference.png","Bar Left Edge",OK,1,279.5000,348.0000,39.5000,1.975000,-909.2799,"OK"
+"C:/Users/Giraffe/Downloads/2DMeasure-main/batch_test_data/reference.png","Bar Right Edge",OK,1,399.5000,348.0000,49.5000,2.475000,909.1339,"OK"
+"C:/Users/Giraffe/Downloads/2DMeasure-main/batch_test_data/reference.png","Circle Diameter",OK,0,,,,,,"OK"
+"C:/Users/Giraffe/Downloads/2DMeasure-main/batch_test_data/reference.png","Bar Width",OK,2,279.5000,348.0000,120.0000,6.000000,,"A(279.500,348.000) B(399.500,348.000)"

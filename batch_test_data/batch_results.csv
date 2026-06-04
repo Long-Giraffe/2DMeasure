@@ -1,0 +1,6 @@
+image_path,name,type,status,value,unit,message
+"C:/Users/Giraffe/Downloads/2DMeasure-main/batch_test_data/reference.png","Template Locator","模板",OK,1.0000,score,"OK"
+"C:/Users/Giraffe/Downloads/2DMeasure-main/batch_test_data/reference.png","Bar Left Edge","线卡尺",OK,39.5000,px,"OK"
+"C:/Users/Giraffe/Downloads/2DMeasure-main/batch_test_data/reference.png","Bar Right Edge","线卡尺",OK,49.5000,px,"OK"
+"C:/Users/Giraffe/Downloads/2DMeasure-main/batch_test_data/reference.png","Circle Diameter","圆卡尺",OK,124.0593,px,"OK"
+"C:/Users/Giraffe/Downloads/2DMeasure-main/batch_test_data/reference.png","Bar Width","边距",OK,120.0000,px,"OK"

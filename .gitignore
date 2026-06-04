@@ -1,7 +1,6 @@
 build/
 x64/
 validation_output/
-batch_test_data/
 .vs/
 .vscode/
 *.user
