@@ -10,7 +10,7 @@
 
 CurveWidget::CurveWidget(QWidget* parent)
     : QWidget(parent) {
-    setMinimumHeight(220);
+    setMinimumHeight(160);
     setMouseTracking(true);
 }
 

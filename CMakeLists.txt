@@ -62,14 +62,28 @@ target_link_libraries(edge_bias_probe PRIVATE
     debug ${OPENCV_DEBUG_LIBS}
 )
 
+add_executable(generate_batch_test_images
+    tools/generate_batch_test_images.cpp
+    src/core/CaliperDetector.cpp
+    src/core/RecipeRunner.cpp
+)
+target_include_directories(generate_batch_test_images PRIVATE src)
+target_include_directories(generate_batch_test_images SYSTEM PRIVATE "${OPENCV_INCLUDE_DIR}")
+target_link_libraries(generate_batch_test_images PRIVATE
+    optimized ${OPENCV_RELEASE_LIBS}
+    debug ${OPENCV_DEBUG_LIBS}
+)
+
 if(MSVC)
     target_compile_options(measure_app PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(caliper_validation PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(edge_bias_probe PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(generate_batch_test_images PRIVATE /W4 /permissive- /utf-8)
 else()
     target_compile_options(measure_app PRIVATE -Wall -Wextra -pedantic)
     target_compile_options(caliper_validation PRIVATE -Wall -Wextra -pedantic)
     target_compile_options(edge_bias_probe PRIVATE -Wall -Wextra -pedantic)
+    target_compile_options(generate_batch_test_images PRIVATE -Wall -Wextra -pedantic)
 endif()
 
 set(QT_BIN_DIR "${QT5_ROOT}/bin")

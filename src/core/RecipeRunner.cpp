@@ -61,10 +61,8 @@ RecipeRunResult RecipeRunner::run(const Recipe& recipe, const cv::Mat& colorBgr)
         return run;
     }
 
+    run.runtimeTools = recipe.tools;
     run.toolResults.resize(recipe.tools.size());
-    cv::Point2d locatorOffset(0.0, 0.0);
-    bool hasLocator = false;
-    bool locatorOk = false;
 
     for (int i = 0; i < static_cast<int>(recipe.tools.size()); ++i) {
         const auto& tool = recipe.tools[static_cast<size_t>(i)];
@@ -73,11 +71,11 @@ RecipeRunResult RecipeRunner::run(const Recipe& recipe, const cv::Mat& colorBgr)
         }
         auto result = detector_.detect(run.measurementImage, tool);
         run.toolResults[static_cast<size_t>(i)] = result;
-        if (!hasLocator) {
-            hasLocator = true;
-            locatorOk = result.ok;
+        if (!run.hasLocator) {
+            run.hasLocator = true;
+            run.locatorOk = result.ok;
             if (result.ok) {
-                locatorOffset = result.offset;
+                run.locatorOffset = result.offset;
             }
         }
     }
@@ -87,14 +85,14 @@ RecipeRunResult RecipeRunner::run(const Recipe& recipe, const cv::Mat& colorBgr)
         if (tool.type == ToolType::TemplateLocator) {
             continue;
         }
-        auto shifted = tool;
-        if (hasLocator && locatorOk) {
-            shifted.p1 += locatorOffset;
-            shifted.p2 += locatorOffset;
-            shifted.center += locatorOffset;
+        auto& runtimeTool = run.runtimeTools[static_cast<size_t>(i)];
+        if (run.hasLocator && run.locatorOk) {
+            runtimeTool.p1 += run.locatorOffset;
+            runtimeTool.p2 += run.locatorOffset;
+            runtimeTool.center += run.locatorOffset;
         }
-        auto result = detector_.detect(run.measurementImage, shifted);
-        if (hasLocator && !locatorOk) {
+        auto result = detector_.detect(run.measurementImage, runtimeTool);
+        if (run.hasLocator && !run.locatorOk) {
             result.message = std::string("Unlocated; ") + result.message;
         }
         run.toolResults[static_cast<size_t>(i)] = result;

@@ -45,6 +45,11 @@ std::string toStdString(const QString& value) {
     return value.toStdString();
 }
 
+QString csvQuote(QString value) {
+    value.replace('"', QStringLiteral("\"\""));
+    return QStringLiteral("\"") + value + QStringLiteral("\"");
+}
+
 QString polarityLabel(measure::EdgePolarity polarity) {
     switch (polarity) {
     case measure::EdgePolarity::DarkToBright:
@@ -150,7 +155,7 @@ MainWindow::MainWindow(QWidget* parent)
 
 void MainWindow::buildUi() {
     setWindowTitle(QStringLiteral("2D Measure - 卡尺配方测量"));
-    resize(1500, 900);
+    resize(1500, 960);
 
     auto* central = new QWidget(this);
     central->setObjectName(QStringLiteral("centralWidget"));
@@ -159,6 +164,7 @@ void MainWindow::buildUi() {
     setCentralWidget(central);
 
     auto* mainSplitter = new QSplitter(Qt::Vertical, central);
+    mainSplitter->setChildrenCollapsible(false);
     rootLayout->addWidget(mainSplitter);
 
     auto* workPanel = new QWidget(mainSplitter);
@@ -241,14 +247,14 @@ void MainWindow::buildUi() {
     imageView_ = new ImageView(centerPanel);
     centerLayout->addWidget(imageView_, 1);
 
-    auto* centerCurveGroup = new QGroupBox(QStringLiteral("灰度 / 导数曲线"), centerPanel);
-    auto* centerCurveLayout = new QVBoxLayout(centerCurveGroup);
-    auto* centerCurveModeCombo = new QComboBox(centerCurveGroup);
+    curveGroup_ = new QGroupBox(QStringLiteral("灰度 / 导数曲线"), centerPanel);
+    auto* centerCurveLayout = new QVBoxLayout(curveGroup_);
+    auto* centerCurveModeCombo = new QComboBox(curveGroup_);
     centerCurveModeCombo->addItems({QStringLiteral("灰度+导数"), QStringLiteral("灰度"), QStringLiteral("导数")});
-    auto* centerCurveWidget = new CurveWidget(centerCurveGroup);
+    auto* centerCurveWidget = new CurveWidget(curveGroup_);
     centerCurveLayout->addWidget(centerCurveModeCombo);
     centerCurveLayout->addWidget(centerCurveWidget, 1);
-    centerLayout->addWidget(centerCurveGroup, 0);
+    centerLayout->addWidget(curveGroup_, 0);
     splitter->addWidget(centerPanel);
 
     auto* rightPanel = new QWidget(splitter);
@@ -382,7 +388,7 @@ void MainWindow::buildUi() {
     splitter->addWidget(rightPanel);
 
     auto* resultGroup = new QGroupBox(QStringLiteral("测量结果"), mainSplitter);
-    resultGroup->setMinimumHeight(180);
+    resultGroup->setMinimumHeight(300);
     auto* resultLayout = new QVBoxLayout(resultGroup);
     resultLayout->setContentsMargins(8, 8, 8, 8);
 
@@ -432,6 +438,8 @@ void MainWindow::buildUi() {
     startBatchButton_ = new QPushButton(QStringLiteral("开始"), batchPage);
     pauseBatchButton_ = new QPushButton(QStringLiteral("暂停"), batchPage);
     cancelBatchButton_ = new QPushButton(QStringLiteral("取消"), batchPage);
+    exportBatchCsvButton_ = new QPushButton(QStringLiteral("导出汇总 CSV"), batchPage);
+    exportBatchCsvButton_->setEnabled(false);
     batchNgModeCombo_ = new QComboBox(batchPage);
     batchNgModeCombo_->addItems({QStringLiteral("记录NG继续"), QStringLiteral("NG暂停")});
     batchProgress_ = new QProgressBar(batchPage);
@@ -439,6 +447,7 @@ void MainWindow::buildUi() {
     batchControls->addWidget(startBatchButton_);
     batchControls->addWidget(pauseBatchButton_);
     batchControls->addWidget(cancelBatchButton_);
+    batchControls->addWidget(exportBatchCsvButton_);
     batchControls->addWidget(batchNgModeCombo_);
     batchControls->addWidget(batchProgress_, 1);
     batchLayout->addLayout(batchControls);
@@ -461,6 +470,7 @@ void MainWindow::buildUi() {
     startBatchButton_->setProperty("role", "primary");
     deleteCaliperButton_->setProperty("role", "danger");
     cancelBatchButton_->setProperty("role", "danger");
+    exportBatchCsvButton_->setProperty("role", "primary");
     addCaliperButton_->setProperty("role", "tool");
     addTemplateButton_->setProperty("role", "tool");
     addCircleButton_->setProperty("role", "tool");
@@ -470,8 +480,8 @@ void MainWindow::buildUi() {
     splitter->setStretchFactor(2, 0);
     splitter->setSizes({280, 880, 340});
     mainSplitter->setStretchFactor(0, 1);
-    mainSplitter->setStretchFactor(1, 0);
-    mainSplitter->setSizes({660, 240});
+    mainSplitter->setStretchFactor(1, 1);
+    mainSplitter->setSizes({580, 360});
 }
 
 void MainWindow::connectUi() {
@@ -483,6 +493,7 @@ void MainWindow::connectUi() {
     connect(startBatchButton_, &QPushButton::clicked, this, &MainWindow::startBatch);
     connect(pauseBatchButton_, &QPushButton::clicked, this, &MainWindow::toggleBatchPause);
     connect(cancelBatchButton_, &QPushButton::clicked, this, &MainWindow::cancelBatch);
+    connect(exportBatchCsvButton_, &QPushButton::clicked, this, &MainWindow::exportBatchCsvAs);
     connect(fitImageButton_, &QPushButton::clicked, imageView_, &ImageView::resetView);
     connect(batchTimer_, &QTimer::timeout, this, &MainWindow::processNextBatchImage);
     connect(batchTable_, &QTableWidget::cellClicked, this, [this](int row, int) {
@@ -815,6 +826,7 @@ void MainWindow::startBatch() {
 
     batchRows_.clear();
     batchTable_->setRowCount(0);
+    exportBatchCsvButton_->setEnabled(false);
     batchIndex_ = 0;
     batchRunning_ = true;
     batchPaused_ = false;
@@ -851,7 +863,12 @@ void MainWindow::processNextBatchImage() {
     if (batchCancelRequested_ || batchIndex_ >= batchFiles_.size()) {
         batchRunning_ = false;
         exportBatchCsv();
-        setStatus(batchCancelRequested_ ? QStringLiteral("批量测试已取消") : QStringLiteral("批量测试完成"));
+        QString statusText = batchCancelRequested_ ? QStringLiteral("批量测试已取消") : QStringLiteral("批量测试完成");
+        if (!batchFolder_.isEmpty() && !batchRows_.empty()) {
+            statusText += QStringLiteral("；汇总 CSV：") +
+                QDir(batchFolder_).absoluteFilePath(QStringLiteral("batch_results.csv"));
+        }
+        setStatus(statusText);
         return;
     }
 
@@ -918,6 +935,7 @@ void MainWindow::processNextBatchImage() {
             batchTable_->setItem(row, col, new QTableWidgetItem(values[col]));
         }
     }
+    exportBatchCsvButton_->setEnabled(!batchRows_.empty());
 
     ++batchIndex_;
     batchProgress_->setValue(batchIndex_);
@@ -934,32 +952,71 @@ void MainWindow::exportBatchCsv() {
     if (batchFolder_.isEmpty() || batchRows_.empty()) {
         return;
     }
-    QFile file(QDir(batchFolder_).absoluteFilePath(QStringLiteral("batch_results.csv")));
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+    const QString path = QDir(batchFolder_).absoluteFilePath(QStringLiteral("batch_results.csv"));
+    QString error;
+    if (!writeBatchCsv(path, &error)) {
+        setStatus(QStringLiteral("批量汇总 CSV 导出失败：") + error);
+    }
+}
+
+void MainWindow::exportBatchCsvAs() {
+    if (batchRows_.empty()) {
+        QMessageBox::information(this, QStringLiteral("导出批量结果"), QStringLiteral("当前没有可导出的批量测量结果。"));
         return;
+    }
+
+    const QString defaultPath = batchFolder_.isEmpty()
+        ? QStringLiteral("batch_results.csv")
+        : QDir(batchFolder_).absoluteFilePath(QStringLiteral("batch_results.csv"));
+    const QString path = QFileDialog::getSaveFileName(
+        this,
+        QStringLiteral("导出批量测量汇总"),
+        defaultPath,
+        QStringLiteral("CSV (*.csv)"));
+    if (path.isEmpty()) {
+        return;
+    }
+
+    QString error;
+    if (!writeBatchCsv(path, &error)) {
+        QMessageBox::warning(this, QStringLiteral("导出失败"), error);
+        return;
+    }
+    setStatus(QStringLiteral("已导出批量测量汇总：") + path);
+}
+
+bool MainWindow::writeBatchCsv(const QString& path, QString* errorMessage) const {
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+        if (errorMessage) {
+            *errorMessage = file.errorString();
+        }
+        return false;
     }
     QTextStream out(&file);
     out.setCodec("UTF-8");
     out << "image_path,name,type,status,value,unit,message\n";
     for (const auto& row : batchRows_) {
-        out << '"' << row.imagePath << "\","
-            << '"' << row.name << "\","
-            << '"' << row.type << "\","
-            << row.status << ','
-            << row.value << ','
-            << row.unit << ','
-            << '"' << row.message << "\"\n";
+        out << csvQuote(row.imagePath) << ','
+            << csvQuote(row.name) << ','
+            << csvQuote(row.type) << ','
+            << csvQuote(row.status) << ','
+            << csvQuote(row.value) << ','
+            << csvQuote(row.unit) << ','
+            << csvQuote(row.message) << '\n';
     }
+    return true;
 }
 
 void MainWindow::addCaliper(QPointF p1, QPointF p2) {
+    const cv::Point2d locatorOffset = currentLocatorOffset();
     measure::CaliperTool tool;
     tool.id = toStdString(QUuid::createUuid().toString(QUuid::WithoutBraces));
     tool.name = toStdString(makeDefaultToolName());
     tool.type = measure::ToolType::LineCaliper;
     tool.channel = recipe_.defaultChannel;
-    tool.p1 = {p1.x(), p1.y()};
-    tool.p2 = {p2.x(), p2.y()};
+    tool.p1 = {p1.x() - locatorOffset.x, p1.y() - locatorOffset.y};
+    tool.p2 = {p2.x() - locatorOffset.x, p2.y() - locatorOffset.y};
     recipe_.tools.push_back(tool);
     selectedToolId_ = tool.id;
     recomputeAll();
@@ -1016,12 +1073,13 @@ void MainWindow::addTemplateLocator(QRectF roi) {
 }
 
 void MainWindow::addCircleCaliper(QPointF center, double innerRadius, double outerRadius) {
+    const cv::Point2d locatorOffset = currentLocatorOffset();
     measure::CaliperTool tool;
     tool.id = toStdString(QUuid::createUuid().toString(QUuid::WithoutBraces));
     tool.name = QStringLiteral("圆形卡尺%1").arg(recipe_.tools.size() + 1).toStdString();
     tool.type = measure::ToolType::CircleCaliper;
     tool.channel = recipe_.defaultChannel;
-    tool.center = {center.x(), center.y()};
+    tool.center = {center.x() - locatorOffset.x, center.y() - locatorOffset.y};
     tool.innerRadius = innerRadius;
     tool.outerRadius = outerRadius;
     recipe_.tools.push_back(tool);
@@ -1075,8 +1133,9 @@ void MainWindow::updateToolGeometry(const QString& id, QPointF p1, QPointF p2) {
         return;
     }
     auto& tool = recipe_.tools[static_cast<size_t>(index)];
-    tool.p1 = {p1.x(), p1.y()};
-    tool.p2 = {p2.x(), p2.y()};
+    const cv::Point2d locatorOffset = currentLocatorOffset();
+    tool.p1 = {p1.x() - locatorOffset.x, p1.y() - locatorOffset.y};
+    tool.p2 = {p2.x() - locatorOffset.x, p2.y() - locatorOffset.y};
     recomputeAll();
     refreshAll();
 }
@@ -1087,7 +1146,8 @@ void MainWindow::updateCircleGeometry(const QString& id, QPointF center, double 
         return;
     }
     auto& tool = recipe_.tools[static_cast<size_t>(index)];
-    tool.center = {center.x(), center.y()};
+    const cv::Point2d locatorOffset = currentLocatorOffset();
+    tool.center = {center.x() - locatorOffset.x, center.y() - locatorOffset.y};
     tool.innerRadius = innerRadius;
     tool.outerRadius = outerRadius;
     recomputeAll();
@@ -1210,7 +1270,7 @@ void MainWindow::applyParametersToCurrentTool() {
 
 void MainWindow::applyThresholdsFromCurve(double positiveThreshold, double negativeThreshold) {
     auto* tool = currentTool();
-    if (!tool) {
+    if (!tool || tool->type != measure::ToolType::LineCaliper) {
         return;
     }
     tool->positiveThreshold = positiveThreshold;
@@ -1230,9 +1290,12 @@ void MainWindow::refreshAll(bool resetImageView) {
     refreshParameterPanel();
     refreshResultTable();
     refreshCurve();
+    const auto& displayTools = runResult_.runtimeTools.size() == recipe_.tools.size()
+        ? runResult_.runtimeTools
+        : recipe_.tools;
     imageView_->setScene(
         image_,
-        recipe_.tools,
+        displayTools,
         results_,
         recipe_.measurements,
         selectedToolId_,
@@ -1449,7 +1512,9 @@ void MainWindow::refreshResultTable() {
 void MainWindow::refreshCurve() {
     const auto* tool = currentTool();
     const auto* result = currentResult();
-    if (tool && result) {
+    const bool showCurve = tool && tool->type == measure::ToolType::LineCaliper;
+    curveGroup_->setVisible(showCurve);
+    if (showCurve && result) {
         curveWidget_->setData(
             result->profile,
             result->gradient,
@@ -1489,6 +1554,13 @@ const measure::CaliperResult* MainWindow::currentResult() const {
         return nullptr;
     }
     return &results_[static_cast<size_t>(index)];
+}
+
+cv::Point2d MainWindow::currentLocatorOffset() const {
+    if (runResult_.hasLocator && runResult_.locatorOk) {
+        return runResult_.locatorOffset;
+    }
+    return {};
 }
 
 QString MainWindow::currentToolId() const {

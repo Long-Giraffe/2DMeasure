@@ -46,6 +46,8 @@ private:
     void cancelBatch();
     void processNextBatchImage();
     void exportBatchCsv();
+    void exportBatchCsvAs();
+    bool writeBatchCsv(const QString& path, QString* errorMessage) const;
     void addCaliper(QPointF p1, QPointF p2);
     void addTemplateLocator(QRectF roi);
     void addCircleCaliper(QPointF center, double innerRadius, double outerRadius);
@@ -67,6 +69,7 @@ private:
     int findToolIndex(const std::string& id) const;
     measure::CaliperTool* currentTool();
     const measure::CaliperResult* currentResult() const;
+    cv::Point2d currentLocatorOffset() const;
     QString currentToolId() const;
     const cv::Mat& currentMeasurementImage() const;
     QImage currentPreviewImage() const;
@@ -123,6 +126,7 @@ private:
     QPushButton* startBatchButton_ = nullptr;
     QPushButton* pauseBatchButton_ = nullptr;
     QPushButton* cancelBatchButton_ = nullptr;
+    QPushButton* exportBatchCsvButton_ = nullptr;
     QPushButton* fitImageButton_ = nullptr;
     QComboBox* batchNgModeCombo_ = nullptr;
     QProgressBar* batchProgress_ = nullptr;
@@ -156,5 +160,6 @@ private:
     QDoubleSpinBox* templateThresholdSpin_ = nullptr;
     QComboBox* curveModeCombo_ = nullptr;
     CurveWidget* curveWidget_ = nullptr;
+    QGroupBox* curveGroup_ = nullptr;
     QTableWidget* resultTable_ = nullptr;
 };

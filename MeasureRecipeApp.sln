@@ -4,6 +4,8 @@ VisualStudioVersion = 16.0.31911.196
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "MeasureRecipeApp", "MeasureRecipeApp.vcxproj", "{D39F38D4-DFE4-4AE4-82B2-10C06572F587}"
 EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "BatchTestDataGenerator", "BatchTestDataGenerator.vcxproj", "{3B99B239-674A-4D8E-BF1F-FD5EBDE74AD2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -14,6 +16,10 @@ Global
 		{D39F38D4-DFE4-4AE4-82B2-10C06572F587}.Debug|x64.Build.0 = Debug|x64
 		{D39F38D4-DFE4-4AE4-82B2-10C06572F587}.Release|x64.ActiveCfg = Release|x64
 		{D39F38D4-DFE4-4AE4-82B2-10C06572F587}.Release|x64.Build.0 = Release|x64
+		{3B99B239-674A-4D8E-BF1F-FD5EBDE74AD2}.Debug|x64.ActiveCfg = Debug|x64
+		{3B99B239-674A-4D8E-BF1F-FD5EBDE74AD2}.Debug|x64.Build.0 = Debug|x64
+		{3B99B239-674A-4D8E-BF1F-FD5EBDE74AD2}.Release|x64.ActiveCfg = Release|x64
+		{3B99B239-674A-4D8E-BF1F-FD5EBDE74AD2}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

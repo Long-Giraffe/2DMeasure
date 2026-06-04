@@ -22,8 +22,12 @@ struct RecipeRunResult {
     bool ok = false;
     std::string message;
     cv::Mat measurementImage;
+    std::vector<MeasureTool> runtimeTools;
     std::vector<CaliperResult> toolResults;
     std::vector<MeasurementResult> measurementResults;
+    bool hasLocator = false;
+    bool locatorOk = false;
+    cv::Point2d locatorOffset;
 };
 
 class RecipeRunner {

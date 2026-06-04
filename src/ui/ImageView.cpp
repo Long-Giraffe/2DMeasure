@@ -61,7 +61,7 @@ void drawOverlayLabel(
 
 ImageView::ImageView(QWidget* parent)
     : QWidget(parent) {
-    setMinimumSize(640, 480);
+    setMinimumSize(640, 320);
     setMouseTracking(true);
 }
 
