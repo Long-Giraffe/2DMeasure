@@ -1,0 +1,1340 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>卡尺边缘精确定位方案</title>
+  <style>
+    :root {
+      --bg: #f3f5f7;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --line: #d8dee6;
+      --line-strong: #b8c2cf;
+      --text: #172033;
+      --muted: #5c6879;
+      --blue: #1769aa;
+      --blue-soft: #e8f2fb;
+      --cyan: #078a9b;
+      --green: #16825d;
+      --green-soft: #e7f6ef;
+      --orange: #b55b0a;
+      --orange-soft: #fff4e8;
+      --red: #b42318;
+      --red-soft: #fff0ef;
+      --code: #172436;
+      --shadow: 0 1px 2px rgba(18, 32, 51, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background: var(--bg);
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    button, input, select { font: inherit; }
+
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code, pre, .mono {
+      font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+    }
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      height: 58px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(8px);
+    }
+
+    .header-inner {
+      max-width: 1480px;
+      height: 100%;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #0e5f9d;
+      border-radius: 6px;
+      color: #fff;
+      background: var(--blue);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .brand-title {
+      min-width: 0;
+      font-weight: 700;
+      font-size: 16px;
+      white-space: nowrap;
+    }
+
+    .header-meta {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .layout {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 230px minmax(0, 1fr);
+      gap: 24px;
+    }
+
+    .side-nav {
+      position: sticky;
+      top: 82px;
+      align-self: start;
+      max-height: calc(100vh - 106px);
+      overflow: auto;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .side-nav .nav-title {
+      margin: 4px 8px 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .side-nav a {
+      display: block;
+      padding: 7px 9px;
+      border-left: 2px solid transparent;
+      color: #415065;
+      font-size: 13px;
+    }
+
+    .side-nav a:hover,
+    .side-nav a.active {
+      color: var(--blue);
+      border-left-color: var(--blue);
+      background: var(--blue-soft);
+      text-decoration: none;
+    }
+
+    main { min-width: 0; }
+
+    section {
+      scroll-margin-top: 78px;
+      margin-bottom: 24px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .intro {
+      padding-top: 32px;
+      border-top: 4px solid var(--blue);
+    }
+
+    h1, h2, h3, h4 {
+      margin: 0;
+      line-height: 1.35;
+      letter-spacing: 0;
+    }
+
+    h1 { font-size: 30px; }
+    h2 { font-size: 22px; }
+    h3 { font-size: 17px; }
+    h4 { font-size: 15px; }
+
+    .lead {
+      max-width: 920px;
+      margin: 14px 0 0;
+      color: #435166;
+      font-size: 16px;
+    }
+
+    .section-head {
+      margin-bottom: 20px;
+      padding-bottom: 13px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section-head p {
+      margin: 8px 0 0;
+      color: var(--muted);
+    }
+
+    .summary-grid,
+    .two-col,
+    .three-col {
+      display: grid;
+      gap: 16px;
+    }
+
+    .summary-grid {
+      margin-top: 24px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .three-col { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .metric,
+    .info-box,
+    .control-panel,
+    .diagram-panel {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface-soft);
+    }
+
+    .metric { padding: 16px; }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .metric .value {
+      margin-top: 5px;
+      color: var(--blue);
+      font-size: 21px;
+      font-weight: 700;
+    }
+
+    .metric .detail {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .callout {
+      margin: 18px 0;
+      padding: 14px 16px;
+      border-left: 4px solid var(--blue);
+      background: var(--blue-soft);
+      color: #24435f;
+    }
+
+    .callout.warning {
+      border-left-color: var(--orange);
+      background: var(--orange-soft);
+      color: #6f431a;
+    }
+
+    .callout.success {
+      border-left-color: var(--green);
+      background: var(--green-soft);
+      color: #195c45;
+    }
+
+    .callout.danger {
+      border-left-color: var(--red);
+      background: var(--red-soft);
+      color: #74251f;
+    }
+
+    .formula {
+      margin: 12px 0;
+      padding: 14px 16px;
+      overflow-x: auto;
+      border: 1px solid #ccd6e1;
+      border-radius: 6px;
+      color: #0f385d;
+      background: #f5f9fd;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .diagram-panel { padding: 18px; }
+
+    .panel-title {
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .panel-title span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pixel-strip {
+      position: relative;
+      margin: 24px 12px 46px;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(62px, 1fr));
+      border-top: 1px solid #34465a;
+      border-bottom: 1px solid #34465a;
+    }
+
+    .pixel {
+      position: relative;
+      height: 88px;
+      display: grid;
+      place-items: center;
+      border-left: 1px solid #34465a;
+      font-family: Consolas, monospace;
+      font-weight: 700;
+    }
+
+    .pixel:last-child { border-right: 1px solid #34465a; }
+    .pixel.bright { color: #172033; background: #fff; }
+    .pixel.dark { color: #fff; background: #0f1824; }
+
+    .center-dot {
+      position: absolute;
+      bottom: -28px;
+      left: 50%;
+      width: 7px;
+      height: 7px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: var(--blue);
+    }
+
+    .center-label {
+      position: absolute;
+      bottom: -49px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: var(--muted);
+      font-size: 12px;
+      font-family: Consolas, monospace;
+      font-weight: 400;
+      white-space: nowrap;
+    }
+
+    .boundary-line {
+      position: absolute;
+      top: -14px;
+      bottom: -21px;
+      left: 60%;
+      z-index: 3;
+      border-left: 2px dashed var(--red);
+      pointer-events: none;
+    }
+
+    .boundary-label {
+      position: absolute;
+      top: -37px;
+      left: 60%;
+      transform: translateX(-50%);
+      padding: 2px 7px;
+      border-radius: 4px;
+      color: #fff;
+      background: var(--red);
+      font-size: 12px;
+      font-family: Consolas, monospace;
+      white-space: nowrap;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(130px, 1fr));
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .flow-step {
+      position: relative;
+      min-height: 122px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--blue);
+      border-radius: 6px;
+      background: var(--surface-soft);
+    }
+
+    .flow-step::after {
+      content: "→";
+      position: absolute;
+      top: 44px;
+      right: -11px;
+      z-index: 2;
+      color: var(--line-strong);
+      font-size: 18px;
+    }
+
+    .flow-step:last-child::after { display: none; }
+
+    .step-no {
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .flow-step h3 { margin-top: 4px; font-size: 15px; }
+    .flow-step p { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
+
+    .interactive {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      gap: 18px;
+    }
+
+    .control-panel { padding: 16px; }
+
+    .control-group { margin-bottom: 16px; }
+    .control-group:last-child { margin-bottom: 0; }
+
+    .control-group label {
+      display: block;
+      margin-bottom: 6px;
+      color: #405064;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    select,
+    input[type="range"] {
+      width: 100%;
+    }
+
+    select {
+      height: 34px;
+      padding: 0 8px;
+      border: 1px solid var(--line-strong);
+      border-radius: 5px;
+      color: var(--text);
+      background: #fff;
+    }
+
+    input[type="range"] { accent-color: var(--blue); }
+
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .range-value {
+      width: 54px;
+      color: var(--blue);
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-line {
+      width: 18px;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--blue);
+    }
+
+    .legend-line.smooth { background: var(--cyan); }
+    .legend-line.gradient { background: var(--orange); }
+    .legend-line.crossing { background: var(--red); }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 330px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .result-readout {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .readout {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #fff;
+    }
+
+    .readout span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .readout strong {
+      display: block;
+      margin-top: 3px;
+      color: var(--blue);
+      font-family: Consolas, monospace;
+      font-size: 14px;
+    }
+
+    .info-box { padding: 16px; }
+    .info-box h3 { margin-bottom: 8px; }
+    .info-box p { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .check-list,
+    .plain-list {
+      margin: 12px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .check-list li,
+    .plain-list li {
+      position: relative;
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .check-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .plain-list li::before {
+      content: "•";
+      position: absolute;
+      left: 4px;
+      color: var(--blue);
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    th {
+      color: #3d4e63;
+      background: #f4f7fa;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+    td.num { font-family: Consolas, monospace; text-align: right; }
+    .ok { color: var(--green); font-weight: 700; }
+    .ng { color: var(--red); font-weight: 700; }
+
+    details {
+      margin: 10px 0;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    summary {
+      padding: 11px 14px;
+      cursor: pointer;
+      color: #33465e;
+      font-weight: 700;
+    }
+
+    details > div {
+      padding: 0 14px 14px;
+      color: var(--muted);
+    }
+
+    pre {
+      margin: 12px 0 0;
+      padding: 15px;
+      overflow-x: auto;
+      border-radius: 6px;
+      color: #dce8f5;
+      background: var(--code);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .code-key { color: #85c7ff; }
+    .code-comment { color: #8ea0b5; }
+    .code-number { color: #f7c873; }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 1px 7px;
+      border: 1px solid #b8d5ec;
+      border-radius: 4px;
+      color: #195c8b;
+      background: #edf6fc;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .file-map {
+      display: grid;
+      gap: 10px;
+    }
+
+    .file-row {
+      display: grid;
+      grid-template-columns: minmax(210px, 0.9fr) minmax(0, 1.5fr);
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface-soft);
+    }
+
+    .file-row code { color: var(--blue); font-weight: 700; }
+    .file-row span { color: var(--muted); font-size: 13px; }
+
+    .footer-note {
+      margin: 6px 0 32px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    @media (max-width: 1100px) {
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .three-col { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: repeat(5, 170px); }
+    }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; padding: 14px; }
+      .side-nav { display: none; }
+      .app-header { height: auto; min-height: 54px; }
+      .header-inner { padding: 10px 14px; }
+      .header-meta { display: none; }
+      section { padding: 20px; }
+      h1 { font-size: 25px; }
+      .interactive, .two-col { grid-template-columns: 1fr; }
+      .file-row { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      section { padding: 16px; }
+      .summary-grid, .result-readout { grid-template-columns: 1fr; }
+      .pixel-strip { grid-template-columns: repeat(5, minmax(48px, 1fr)); margin-left: 0; margin-right: 0; }
+      .pixel { height: 70px; }
+      canvas { height: 280px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand-mark">ED</div>
+      <div class="brand-title">卡尺边缘精确定位方案</div>
+      <div class="header-meta"><span class="status-dot"></span>对应当前 CaliperDetector 实现</div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="side-nav" aria-label="文档目录">
+      <div class="nav-title">目录</div>
+      <a href="#overview">方案摘要</a>
+      <a href="#coordinate">坐标定义</a>
+      <a href="#pipeline">定位流程</a>
+      <a href="#step-edge">0 / 255 阶跃边缘</a>
+      <a href="#precision">精度保障</a>
+      <a href="#parameters">参数建议</a>
+      <a href="#troubleshooting">异常与排查</a>
+      <a href="#validation">验证结果</a>
+      <a href="#code-map">代码对应关系</a>
+    </nav>
+
+    <main>
+      <section id="overview" class="intro">
+        <h1>工业卡尺边缘定位：从像素级到亚像素级</h1>
+        <p class="lead">
+          本方案将二维图像中的卡尺区域转换为一维灰度剖面，通过平滑、导数响应、阈值筛选和亚像素精修获得边缘位置。
+          对于稳定、清晰的 <span class="mono">0 ↔ 255</span> 阶跃边缘，边界应落在相邻像素中心之间，因此结果自然是 <span class="mono">.5</span>，而不是某个整数像素中心。
+        </p>
+
+        <div class="summary-grid">
+          <div class="metric">
+            <div class="label">剖面采样间距</div>
+            <div class="value">0.25 px</div>
+            <div class="detail">双线性插值实现过采样</div>
+          </div>
+          <div class="metric">
+            <div class="label">理想阶跃边界</div>
+            <div class="value">N + 0.5</div>
+            <div class="detail">位于两个像素中心之间</div>
+          </div>
+          <div class="metric">
+            <div class="label">主要定位定义</div>
+            <div class="value">中灰值穿越</div>
+            <div class="detail">在原始剖面上精修</div>
+          </div>
+          <div class="metric">
+            <div class="label">降级定位定义</div>
+            <div class="value">导数峰值</div>
+            <div class="detail">二次曲线亚像素拟合</div>
+          </div>
+        </div>
+
+        <div class="callout success">
+          <strong>核心结论：</strong>理想的 <span class="mono">255 → 0</span> 或 <span class="mono">0 → 255</span> 边缘不需要人为加 <span class="mono">0.5</span>。
+          算法在像素中心坐标系中，通过中灰值穿越计算出真实的 <span class="mono">.5</span> 边界；固定补偿会使其他亚像素边缘产生系统偏差。
+        </div>
+      </section>
+
+      <section id="coordinate">
+        <div class="section-head">
+          <h2>1. 坐标定义：像素中心与边界</h2>
+          <p>精确定位首先要统一坐标语义。OpenCV 图像索引表示像素中心，而物理边界位于像素单元之间。</p>
+        </div>
+
+        <div class="diagram-panel">
+          <div class="panel-title">
+            <h3>像素中心坐标示意</h3>
+            <span>示例：白色像素 79 与黑色像素 80 之间</span>
+          </div>
+          <div class="pixel-strip" aria-label="像素中心和边界示意图">
+            <div class="boundary-line"></div>
+            <div class="boundary-label">真实边界 x = 79.5</div>
+            <div class="pixel bright">255<span class="center-dot"></span><span class="center-label">x = 77</span></div>
+            <div class="pixel bright">255<span class="center-dot"></span><span class="center-label">x = 78</span></div>
+            <div class="pixel bright">255<span class="center-dot"></span><span class="center-label">x = 79</span></div>
+            <div class="pixel dark">0<span class="center-dot"></span><span class="center-label">x = 80</span></div>
+            <div class="pixel dark">0<span class="center-dot"></span><span class="center-label">x = 81</span></div>
+          </div>
+        </div>
+
+        <div class="two-col" style="margin-top:16px">
+          <div class="info-box">
+            <h3>像素中心坐标</h3>
+            <p>图像数组中的 <span class="mono">image(y, x)</span> 对应坐标 <span class="mono">(x, y)</span> 的像素中心。整数坐标不是像素左上角，而是采样值所在的位置。</p>
+          </div>
+          <div class="info-box">
+            <h3>像素单元边界</h3>
+            <p>像素 <span class="mono">x = 79</span> 覆盖近似区间 <span class="mono">[78.5, 79.5)</span>，像素 <span class="mono">x = 80</span> 覆盖 <span class="mono">[79.5, 80.5)</span>，所以两者边界为 <span class="mono">79.5</span>。</p>
+          </div>
+        </div>
+
+        <div class="callout warning">
+          Qt 绘制时可能需要在显示坐标边界进行 <span class="mono">±0.5</span> 转换，以对齐画笔和像素格；这属于显示坐标转换。
+          检测算法内部的边缘坐标不能统一加 <span class="mono">0.5</span>。
+        </div>
+      </section>
+
+      <section id="pipeline">
+        <div class="section-head">
+          <h2>2. 完整边缘定位流程</h2>
+          <p>当前实现采用“稳定候选发现 + 原始剖面精修”的双阶段策略。</p>
+        </div>
+
+        <div class="flow" aria-label="边缘定位流程">
+          <div class="flow-step">
+            <div class="step-no">STEP 01</div>
+            <h3>扩展扫描线</h3>
+            <p>按滤波核支持范围增加 padding，避免端点附近的卷积响应被截断。</p>
+          </div>
+          <div class="flow-step">
+            <div class="step-no">STEP 02</div>
+            <h3>提取灰度剖面</h3>
+            <p>沿扫描方向每 0.25 px 双线性采样，并在卡尺宽度方向求平均。</p>
+          </div>
+          <div class="flow-step">
+            <div class="step-no">STEP 03</div>
+            <h3>发现候选边缘</h3>
+            <p>平滑剖面后计算高斯导数，按极性和阈值找到连续响应段。</p>
+          </div>
+          <div class="flow-step">
+            <div class="step-no">STEP 04</div>
+            <h3>亚像素定位</h3>
+            <p>优先在原始剖面中寻找中灰值穿越；条件不满足时拟合导数峰值。</p>
+          </div>
+          <div class="flow-step">
+            <div class="step-no">STEP 05</div>
+            <h3>映射回图像</h3>
+            <p>去除 padding，将一维位置沿卡尺单位方向转换为二维边缘点。</p>
+          </div>
+        </div>
+
+        <div class="two-col" style="margin-top:20px">
+          <div>
+            <h3>扫描与采样</h3>
+            <div class="formula">padding = max(0, 3σ<sub>smooth</sub> + 3σ<sub>derivative</sub> + 2Δs)</div>
+            <div class="formula">P(s) = mean<sub>t ∈ width</sub> I(p<sub>1</sub> + s·u + t·v)</div>
+            <p>其中 <span class="mono">u</span> 为卡尺扫描方向，<span class="mono">v</span> 为垂直方向，<span class="mono">Δs = 0.25 px</span>。宽度方向求平均可以降低随机噪声，同时保留沿扫描方向的边缘位置。</p>
+          </div>
+          <div>
+            <h3>候选与精修</h3>
+            <div class="formula">G(s) = d/ds [ Gaussian(σ) * P(s) ]</div>
+            <div class="formula">p<sub>edge</sub> = p<sub>1</sub> + u · s<sub>edge</sub></div>
+            <p>正梯度表示 <span class="mono">0 → 255</span>，负梯度表示 <span class="mono">255 → 0</span>。阈值筛选保留真正的响应段，再由中灰值穿越或导数峰值给出亚像素坐标。</p>
+          </div>
+        </div>
+
+        <pre><span class="code-comment">// 当前实现的关键策略</span>
+rawProfile     = extractProfileAlongLine(..., sampleSpacing = <span class="code-number">0.25</span>);
+smoothProfile  = gaussianSmooth(rawProfile, profileSmoothSigma);
+gradient       = gaussianDerivative(smoothProfile, derivativeSigma);
+candidates     = findThresholdSegments(gradient, polarity, thresholds);
+
+<span class="code-key">for</span> (candidate : candidates) {
+    edge = refineProfileMidpointCrossing(rawProfile, candidate);
+    <span class="code-key">if</span> (!edge.valid)
+        edge = fitQuadraticSubpixel(gradient, candidate.peak);
+}</pre>
+      </section>
+
+      <section id="step-edge">
+        <div class="section-head">
+          <h2>3. 0 / 255 突变边缘如何精确定位</h2>
+          <p>交互图展示理想阶跃边缘的原始剖面、平滑剖面、梯度响应和中灰值穿越位置。</p>
+        </div>
+
+        <div class="interactive">
+          <div class="control-panel">
+            <div class="control-group">
+              <label for="polarity">边缘方向</label>
+              <select id="polarity">
+                <option value="fall">255 → 0（亮到暗）</option>
+                <option value="rise">0 → 255（暗到亮）</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label for="boundary">真实边界位置</label>
+              <div class="range-row">
+                <input id="boundary" type="range" min="78.10" max="80.90" step="0.05" value="79.50">
+                <span id="boundaryValue" class="range-value">79.50</span>
+              </div>
+            </div>
+            <div class="control-group">
+              <label for="blur">模拟光学模糊程度</label>
+              <div class="range-row">
+                <input id="blur" type="range" min="0.20" max="1.80" step="0.10" value="0.45">
+                <span id="blurValue" class="range-value">0.45</span>
+              </div>
+            </div>
+            <div class="control-group">
+              <label for="noise">模拟噪声幅度</label>
+              <div class="range-row">
+                <input id="noise" type="range" min="0" max="20" step="1" value="0">
+                <span id="noiseValue" class="range-value">0</span>
+              </div>
+            </div>
+            <div class="callout" style="margin:12px 0 0; font-size:12px">
+              干净阶跃的中灰值为 <span class="mono">127.5</span>。当相邻像素中心分别为 255 和 0 时，穿越点正好位于两者中间。
+            </div>
+          </div>
+
+          <div>
+            <canvas id="profileCanvas" width="920" height="330" aria-label="阶跃边缘剖面图"></canvas>
+            <div class="legend">
+              <span class="legend-item"><span class="legend-line"></span>原始剖面</span>
+              <span class="legend-item"><span class="legend-line smooth"></span>平滑剖面</span>
+              <span class="legend-item"><span class="legend-line gradient"></span>归一化梯度</span>
+              <span class="legend-item"><span class="legend-line crossing"></span>中灰值穿越</span>
+            </div>
+            <div class="result-readout">
+              <div class="readout"><span>左平台灰度</span><strong id="leftLevel">255.0</strong></div>
+              <div class="readout"><span>右平台灰度</span><strong id="rightLevel">0.0</strong></div>
+              <div class="readout"><span>中灰值定位</span><strong id="crossingValue">79.500 px</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col" style="margin-top:20px">
+          <div class="info-box">
+            <h3>理想 255 → 0 示例</h3>
+            <div class="formula">left = 255, right = 0, midpoint = (255 + 0) / 2 = 127.5</div>
+            <div class="formula">x = 79 + (127.5 - 255) / (0 - 255) = 79.5</div>
+            <p>双线性插值使像素中心之间的灰度连续变化，因此中灰值穿越自然得到 <span class="mono">79.5</span>。</p>
+          </div>
+          <div class="info-box">
+            <h3>理想 0 → 255 示例</h3>
+            <div class="formula">left = 0, right = 255, midpoint = (0 + 255) / 2 = 127.5</div>
+            <div class="formula">x = 79 + (127.5 - 0) / (255 - 0) = 79.5</div>
+            <p>边缘极性只决定梯度符号，不改变几何边界位置。两个方向都应得到相同的 <span class="mono">.5</span> 坐标。</p>
+          </div>
+        </div>
+
+        <div class="callout warning">
+          <strong>保证范围：</strong>只有当边缘两侧平台稳定、对比度足够、边缘方向与梯度极性一致，并且中灰值穿越可被可靠找到时，理想阶跃才应精确落在 <span class="mono">.5</span>。
+          噪声、反光、阴影、过曝、光学模糊或非对称灰度过渡都会改变实际定位定义。
+        </div>
+      </section>
+
+      <section id="precision">
+        <div class="section-head">
+          <h2>4. 如何保证精确定位</h2>
+          <p>算法分辨率只是基础，最终准确度由采样、信号质量、定位定义、标定和机械稳定性共同决定。</p>
+        </div>
+
+        <div class="three-col">
+          <div class="info-box">
+            <h3>算法层</h3>
+            <ul class="check-list">
+              <li>0.25 px 过采样，避免只在整数点比较。</li>
+              <li>卡尺宽度方向求平均，降低随机噪声。</li>
+              <li>扫描线 padding，保护端点边缘的滤波响应。</li>
+              <li>平滑剖面只用于发现候选，原始剖面用于精修。</li>
+              <li>中灰值条件不可靠时，降级为导数峰值拟合。</li>
+            </ul>
+          </div>
+          <div class="info-box">
+            <h3>成像层</h3>
+            <ul class="check-list">
+              <li>保持照明均匀，减少阴影和高光。</li>
+              <li>避免曝光饱和，保留边缘两侧灰度差。</li>
+              <li>确保对焦稳定，控制景深与运动模糊。</li>
+              <li>卡尺方向尽量垂直于目标边缘。</li>
+              <li>选择对比度最高、最稳定的颜色通道。</li>
+            </ul>
+          </div>
+          <div class="info-box">
+            <h3>测量系统层</h3>
+            <ul class="check-list">
+              <li>使用标定板建立 px 与实际单位关系。</li>
+              <li>修正镜头畸变和透视误差。</li>
+              <li>固定相机、镜头、光源和被测物姿态。</li>
+              <li>用重复测量评估 3σ 波动与偏差。</li>
+              <li>用已知尺寸样件验证准确度，而非只看重复性。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout danger">
+          <strong>亚像素分辨率不等于亚像素准确度。</strong>
+          算法可以输出三位小数，但如果光学、标定或机械系统存在偏差，结果仍然可能不准确。必须同时评估重复性、线性、偏差和现场环境稳定性。
+        </div>
+
+        <h3 style="margin-top:22px">原始剖面中灰值精修的可靠性条件</h3>
+        <div class="table-wrap" style="margin-top:10px">
+          <table>
+            <thead>
+              <tr><th>条件</th><th>当前判断方式</th><th>目的</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>对比度存在</td><td><span class="mono">|left - right| ≥ 1.0</span></td><td>避免无信号区域产生伪定位</td></tr>
+              <tr><td>极性一致</td><td>左右平台方向与梯度符号一致</td><td>避免将错误穿越点当成目标边缘</td></tr>
+              <tr><td>平台稳定</td><td>肩部最大偏差不超过 <span class="mono">max(1.0, contrast × 8%)</span></td><td>过滤纹理、噪声和多重边缘</td></tr>
+              <tr><td>穿越存在</td><td>候选附近可找到中灰值交叉区间</td><td>确保线性插值有明确的左右样本</td></tr>
+              <tr><td>位置合理</td><td>选择最接近导数峰值的穿越点</td><td>在多个交叉点中锁定目标边缘</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="parameters">
+        <div class="section-head">
+          <h2>5. 参数设置建议</h2>
+          <p>参数应以实际图像的噪声、边缘宽度和目标结构为依据，避免用同一组数值覆盖所有场景。</p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>参数</th><th>作用</th><th>建议</th><th>过大或过小的影响</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="mono">width</span></td>
+                <td>垂直扫描方向的平均宽度</td>
+                <td>平直边缘可适当增大；弯曲或局部边缘应减小</td>
+                <td>过大可能混入其他结构，过小则抗噪不足</td>
+              </tr>
+              <tr>
+                <td><span class="mono">profileSmoothSigma</span></td>
+                <td>剖面平滑</td>
+                <td>干净阶跃使用较小值，噪声高时适当增大</td>
+                <td>过大会合并近距离边缘，过小会产生伪峰</td>
+              </tr>
+              <tr>
+                <td><span class="mono">derivativeSigma</span></td>
+                <td>导数核尺度</td>
+                <td>与实际边缘过渡宽度匹配</td>
+                <td>尺度不匹配会降低响应或改变峰值位置</td>
+              </tr>
+              <tr>
+                <td><span class="mono">positiveThreshold</span></td>
+                <td>0 → 255 的最小梯度</td>
+                <td>高于背景噪声梯度，低于目标边缘响应</td>
+                <td>过高会漏检，过低会引入纹理伪边缘</td>
+              </tr>
+              <tr>
+                <td><span class="mono">negativeThreshold</span></td>
+                <td>255 → 0 的最小梯度</td>
+                <td>按负梯度幅值设置，与正阈值分开校验</td>
+                <td>符号或幅值错误会使亮到暗边缘漏检</td>
+              </tr>
+              <tr>
+                <td><span class="mono">polarity</span></td>
+                <td>限定边缘方向</td>
+                <td>已知目标明暗关系时使用明确极性</td>
+                <td>使用 Any 会增加错误边缘被选中的概率</td>
+              </tr>
+              <tr>
+                <td><span class="mono">selection</span></td>
+                <td>First / Last / Strongest</td>
+                <td>根据目标结构选择，不要仅依赖 Strongest</td>
+                <td>反光或纹理可能比真实边缘更强</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="two-col" style="margin-top:18px">
+          <div class="callout" style="margin:0">
+            <strong>调参顺序建议：</strong>先确定卡尺方向和宽度，再观察原始灰度剖面，随后设置极性和阈值，最后微调平滑与导数尺度。
+          </div>
+          <div class="callout warning" style="margin:0">
+            <strong>不要用固定 +0.5 修正结果：</strong>它只能碰巧修正某一种错误坐标解释，却会对已经正确的亚像素边缘增加 0.5 px 系统偏差。
+          </div>
+        </div>
+      </section>
+
+      <section id="troubleshooting">
+        <div class="section-head">
+          <h2>6. 常见异常与排查</h2>
+          <p>定位不稳定时，先判断问题来自信号、参数、几何还是坐标转换。</p>
+        </div>
+
+        <details open>
+          <summary>0 / 255 阶跃没有定位到 .5</summary>
+          <div>
+            检查原始图像是否真的是相邻像素中心一个为 0、另一个为 255；确认卡尺是否垂直穿过边缘；确认中灰值精修是否因平台不稳定而降级为导数峰值；检查结果是否在显示层又被加减了 0.5。
+          </div>
+        </details>
+        <details>
+          <summary>边缘位置随卡尺宽度变化</summary>
+          <div>
+            目标边缘可能不平直、存在倾斜、曲率、纹理或照明不均。宽度方向求平均会改变剖面形状。缩小宽度，或调整卡尺方向使其更垂直于目标边缘。
+          </div>
+        </details>
+        <details>
+          <summary>边缘位置随平滑参数变化</summary>
+          <div>
+            实际边缘可能不是对称过渡，或附近存在第二条边缘。平滑尺度改变后，导数峰值会移动或合并。优先检查原始剖面和附近结构，并避免过度平滑。
+          </div>
+        </details>
+        <details>
+          <summary>前向扫描和反向扫描结果不同</summary>
+          <div>
+            检查极性是否随方向正确解释，检查 First / Last 选择模式是否仍指向同一物理边缘，并确认端点 padding 和扫描长度裁剪正确。
+          </div>
+        </details>
+        <details>
+          <summary>算法重复性好，但实际尺寸偏差大</summary>
+          <div>
+            这是准确度问题，通常与像素标定、镜头畸变、透视、被测物高度变化或机械安装有关。使用已知尺寸样件做多位置标定验证。
+          </div>
+        </details>
+      </section>
+
+      <section id="validation">
+        <div class="section-head">
+          <h2>7. 当前验证结果</h2>
+          <p>以下数据来自仓库中的合成图验证，用于检查边缘偏差、方向一致性、端点处理和亚像素稳定性。</p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>验证项目</th><th>测量值</th><th>期望值</th><th>误差 / 指标</th><th>状态</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>单条垂直边缘</td><td class="num">100.3492</td><td class="num">100.3500</td><td class="num">-0.0008 px</td><td class="ok">PASS</td></tr>
+              <tr><td>前向 / 反向有效端点</td><td class="num">-</td><td class="num">一致</td><td class="num">0.0000 px</td><td class="ok">PASS</td></tr>
+              <tr><td>前向 / 反向，p2=image.cols</td><td class="num">-</td><td class="num">一致</td><td class="num">0.0000 px</td><td class="ok">PASS</td></tr>
+              <tr><td>沿扫描方向亚像素平移</td><td class="num">-</td><td class="num">稳定</td><td class="num">0.0013 px 抖动</td><td class="ok">PASS</td></tr>
+              <tr><td>垂直边缘的垂直方向平移</td><td class="num">-</td><td class="num">不变</td><td class="num">0.0000 px</td><td class="ok">PASS</td></tr>
+              <tr><td>倾斜边缘 y 平移几何关系</td><td class="num">-</td><td class="num">理论位置</td><td class="num">0.0004 px</td><td class="ok">PASS</td></tr>
+              <tr><td>双边缘亮条纹</td><td class="num">70.5000</td><td class="num">70.5000</td><td class="num">0.0000 px</td><td class="ok">PASS</td></tr>
+              <tr><td>靠近剖面末端的边缘</td><td class="num">218.5000</td><td class="num">218.5000</td><td class="num">0.0000 px</td><td class="ok">PASS</td></tr>
+              <tr><td>理想 255 → 0 边缘</td><td class="num">79.500000</td><td class="num">79.500000</td><td class="num">0.000000 px</td><td class="ok">PASS</td></tr>
+              <tr><td>理想 0 → 255 边缘</td><td class="num">160.500000</td><td class="num">160.500000</td><td class="num">0.000000 px</td><td class="ok">PASS</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout" style="margin-bottom:0">
+          合成图验证证明算法定义和数值实现正确；现场应用仍需使用真实相机、镜头、光源和工件进行 GR&amp;R、偏差与线性验证。
+        </div>
+      </section>
+
+      <section id="code-map">
+        <div class="section-head">
+          <h2>8. 与当前代码的对应关系</h2>
+          <p>后续维护或交给其他 AI 修改时，可从以下文件和函数开始定位。</p>
+        </div>
+
+        <div class="file-map">
+          <div class="file-row">
+            <code>src/core/CaliperDetector.h</code>
+            <span>检测器接口、结果结构和 <span class="mono">kProfileSampleSpacing = 0.25</span> 定义。</span>
+          </div>
+          <div class="file-row">
+            <code>src/core/CaliperDetector.cpp</code>
+            <span>扫描线扩展、双线性采样、剖面提取、导数计算、候选边缘发现、中灰值精修和二维坐标映射。</span>
+          </div>
+          <div class="file-row">
+            <code>refineProfileMidpointCrossing()</code>
+            <span>在原始剖面上计算左右平台、中灰值和穿越点，是理想 <span class="mono">0 ↔ 255</span> 边缘定位到 <span class="mono">.5</span> 的关键。</span>
+          </div>
+          <div class="file-row">
+            <code>fitQuadraticSubpixel()</code>
+            <span>当中灰值精修不满足可靠性条件时，对导数峰值进行二次曲线亚像素拟合。</span>
+          </div>
+          <div class="file-row">
+            <code>tools/edge_bias_probe.cpp</code>
+            <span>构造理想黑白阶跃边缘，验证 <span class="mono">255 → 0</span> 和 <span class="mono">0 → 255</span> 的边界偏差。</span>
+          </div>
+          <div class="file-row">
+            <code>caliper_validation_results.csv</code>
+            <span>记录当前合成图验证的测量值、期望值、误差和通过状态。</span>
+          </div>
+        </div>
+
+        <div class="callout warning">
+          修改算法时建议保留三条约束：内部坐标继续使用像素中心坐标；理想黑白阶跃必须回归到 <span class="mono">.5</span>；绘制层坐标转换不能反向污染检测结果。
+        </div>
+      </section>
+
+      <div class="footer-note">卡尺边缘精确定位方案 · 面向配方编辑、批量测量与算法维护</div>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      const canvas = document.getElementById("profileCanvas");
+      const ctx = canvas.getContext("2d");
+      const polarity = document.getElementById("polarity");
+      const boundary = document.getElementById("boundary");
+      const blur = document.getElementById("blur");
+      const noise = document.getElementById("noise");
+      const boundaryValue = document.getElementById("boundaryValue");
+      const blurValue = document.getElementById("blurValue");
+      const noiseValue = document.getElementById("noiseValue");
+      const leftLevel = document.getElementById("leftLevel");
+      const rightLevel = document.getElementById("rightLevel");
+      const crossingValue = document.getElementById("crossingValue");
+
+      const xMin = 76.5;
+      const xMax = 83.0;
+      const plot = { left: 58, right: 24, top: 24, bottom: 44 };
+
+      function sigmoid(x) {
+        return 1 / (1 + Math.exp(-x));
+      }
+
+      function deterministicNoise(x, amplitude) {
+        return amplitude * (
+          0.55 * Math.sin(x * 16.7) +
+          0.30 * Math.sin(x * 41.3 + 0.8) +
+          0.15 * Math.sin(x * 93.1 + 1.7)
+        );
+      }
+
+      function mapX(x) {
+        return plot.left + (x - xMin) / (xMax - xMin) * (canvas.width - plot.left - plot.right);
+      }
+
+      function mapY(y) {
+        return plot.top + (270 - y) / 300 * (canvas.height - plot.top - plot.bottom);
+      }
+
+      function drawPath(points, color, width, dash) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.setLineDash(dash || []);
+        ctx.beginPath();
+        points.forEach(function (point, index) {
+          const px = mapX(point.x);
+          const py = mapY(point.y);
+          if (index === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function draw() {
+        const isRise = polarity.value === "rise";
+        const edgeX = Number(boundary.value);
+        const sigma = Number(blur.value);
+        const noiseAmp = Number(noise.value);
+        boundaryValue.textContent = edgeX.toFixed(2);
+        blurValue.textContent = sigma.toFixed(2);
+        noiseValue.textContent = noiseAmp.toFixed(0);
+
+        const left = isRise ? 0 : 255;
+        const right = isRise ? 255 : 0;
+        const midpoint = (left + right) / 2;
+        leftLevel.textContent = left.toFixed(1);
+        rightLevel.textContent = right.toFixed(1);
+        crossingValue.textContent = edgeX.toFixed(3) + " px";
+
+        const raw = [];
+        const smooth = [];
+        const grad = [];
+        const count = 280;
+        for (let i = 0; i <= count; i++) {
+          const x = xMin + (xMax - xMin) * i / count;
+          const sharpK = 20;
+          const softK = Math.max(1.4, 4.8 / sigma);
+          const sharpMix = sigmoid((x - edgeX) * sharpK);
+          const softMix = sigmoid((x - edgeX) * softK);
+          const rawValue = left + (right - left) * sharpMix + deterministicNoise(x, noiseAmp);
+          const smoothValue = left + (right - left) * softMix;
+          const derivative = (right - left) * softK * softMix * (1 - softMix);
+          raw.push({ x: x, y: Math.max(0, Math.min(255, rawValue)) });
+          smooth.push({ x: x, y: smoothValue });
+          grad.push({ x: x, y: 127.5 + derivative * 0.18 });
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.strokeStyle = "#e2e7ed";
+        ctx.lineWidth = 1;
+        ctx.font = "12px Consolas";
+        ctx.fillStyle = "#6a7788";
+
+        [0, 64, 127.5, 192, 255].forEach(function (value) {
+          const y = mapY(value);
+          ctx.beginPath();
+          ctx.moveTo(plot.left, y);
+          ctx.lineTo(canvas.width - plot.right, y);
+          ctx.stroke();
+          ctx.fillText(String(value), 12, y + 4);
+        });
+
+        for (let x = 77; x <= 83; x++) {
+          const px = mapX(x);
+          ctx.beginPath();
+          ctx.moveTo(px, plot.top);
+          ctx.lineTo(px, canvas.height - plot.bottom);
+          ctx.stroke();
+          ctx.fillText(String(x), px - 8, canvas.height - 16);
+        }
+
+        const midY = mapY(midpoint);
+        ctx.save();
+        ctx.strokeStyle = "#aeb9c6";
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(plot.left, midY);
+        ctx.lineTo(canvas.width - plot.right, midY);
+        ctx.stroke();
+        ctx.restore();
+
+        const edgePx = mapX(edgeX);
+        ctx.save();
+        ctx.strokeStyle = "#b42318";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([7, 5]);
+        ctx.beginPath();
+        ctx.moveTo(edgePx, plot.top);
+        ctx.lineTo(edgePx, canvas.height - plot.bottom);
+        ctx.stroke();
+        ctx.restore();
+
+        drawPath(raw, "#1769aa", 2.2);
+        drawPath(smooth, "#078a9b", 2.2);
+        drawPath(grad, "#b55b0a", 1.8);
+
+        ctx.fillStyle = "#b42318";
+        ctx.beginPath();
+        ctx.arc(edgePx, midY, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.font = "12px Microsoft YaHei, Segoe UI, sans-serif";
+        ctx.fillStyle = "#b42318";
+        ctx.fillText("中灰值穿越 x = " + edgeX.toFixed(3), Math.min(edgePx + 8, canvas.width - 160), midY - 10);
+
+        ctx.fillStyle = "#5c6879";
+        ctx.fillText("灰度 / 归一化梯度", plot.left, 14);
+        ctx.fillText("扫描位置 x (px)", canvas.width - 118, canvas.height - 16);
+      }
+
+      [polarity, boundary, blur, noise].forEach(function (control) {
+        control.addEventListener("input", draw);
+        control.addEventListener("change", draw);
+      });
+
+      const navLinks = Array.from(document.querySelectorAll(".side-nav a"));
+      const sections = Array.from(document.querySelectorAll("main section"));
+      const observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          navLinks.forEach(function (link) {
+            link.classList.toggle("active", link.getAttribute("href") === "#" + entry.target.id);
+          });
+        });
+      }, { rootMargin: "-20% 0px -70% 0px" });
+      sections.forEach(function (section) { observer.observe(section); });
+
+      draw();
+    })();
+  </script>
+</body>
+</html>
