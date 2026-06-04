@@ -58,7 +58,7 @@ private:
     void applyParametersToCurrentTool();
     void applyThresholdsFromCurve(double positiveThreshold, double negativeThreshold);
     void recomputeAll();
-    void refreshAll();
+    void refreshAll(bool resetImageView = false);
     void refreshToolList();
     void refreshParameterPanel();
     void refreshResultTable();
@@ -123,6 +123,7 @@ private:
     QPushButton* startBatchButton_ = nullptr;
     QPushButton* pauseBatchButton_ = nullptr;
     QPushButton* cancelBatchButton_ = nullptr;
+    QPushButton* fitImageButton_ = nullptr;
     QComboBox* batchNgModeCombo_ = nullptr;
     QProgressBar* batchProgress_ = nullptr;
     QTableWidget* batchTable_ = nullptr;

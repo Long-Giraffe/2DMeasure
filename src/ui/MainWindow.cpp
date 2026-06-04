@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFormLayout>
+#include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -152,6 +153,7 @@ void MainWindow::buildUi() {
     resize(1500, 900);
 
     auto* central = new QWidget(this);
+    central->setObjectName(QStringLiteral("centralWidget"));
     auto* rootLayout = new QVBoxLayout(central);
     rootLayout->setContentsMargins(6, 6, 6, 6);
     setCentralWidget(central);
@@ -170,15 +172,15 @@ void MainWindow::buildUi() {
     auto* leftLayout = new QVBoxLayout(leftPanel);
 
     auto* fileGroup = new QGroupBox(QStringLiteral("图像 / 配方"), leftPanel);
-    auto* fileLayout = new QVBoxLayout(fileGroup);
+    auto* fileLayout = new QGridLayout(fileGroup);
     openImageButton_ = new QPushButton(QStringLiteral("打开图像"), fileGroup);
     loadRecipeButton_ = new QPushButton(QStringLiteral("加载配方"), fileGroup);
     saveRecipeButton_ = new QPushButton(QStringLiteral("保存配方"), fileGroup);
     exportCsvButton_ = new QPushButton(QStringLiteral("导出 CSV"), fileGroup);
-    fileLayout->addWidget(openImageButton_);
-    fileLayout->addWidget(loadRecipeButton_);
-    fileLayout->addWidget(saveRecipeButton_);
-    fileLayout->addWidget(exportCsvButton_);
+    fileLayout->addWidget(openImageButton_, 0, 0);
+    fileLayout->addWidget(loadRecipeButton_, 0, 1);
+    fileLayout->addWidget(saveRecipeButton_, 1, 0);
+    fileLayout->addWidget(exportCsvButton_, 1, 1);
     leftLayout->addWidget(fileGroup);
 
     auto* calibrationGroup = new QGroupBox(QStringLiteral("比例尺"), leftPanel);
@@ -205,9 +207,12 @@ void MainWindow::buildUi() {
     addCircleButton_->setCheckable(true);
     deleteCaliperButton_ = new QPushButton(QStringLiteral("删除选中卡尺"), toolsGroup);
     toolList_ = new QListWidget(toolsGroup);
-    toolsLayout->addWidget(addCaliperButton_);
-    toolsLayout->addWidget(addTemplateButton_);
-    toolsLayout->addWidget(addCircleButton_);
+    auto* createToolLayout = new QHBoxLayout();
+    createToolLayout->setSpacing(5);
+    createToolLayout->addWidget(addCaliperButton_);
+    createToolLayout->addWidget(addTemplateButton_);
+    createToolLayout->addWidget(addCircleButton_);
+    toolsLayout->addLayout(createToolLayout);
     toolsLayout->addWidget(deleteCaliperButton_);
     toolsLayout->addWidget(toolList_, 1);
     leftLayout->addWidget(toolsGroup, 1);
@@ -216,6 +221,23 @@ void MainWindow::buildUi() {
     auto* centerPanel = new QWidget(splitter);
     auto* centerLayout = new QVBoxLayout(centerPanel);
     centerLayout->setContentsMargins(0, 0, 0, 0);
+    centerLayout->setSpacing(6);
+
+    auto* imageToolbar = new QWidget(centerPanel);
+    imageToolbar->setObjectName(QStringLiteral("imageToolbar"));
+    auto* imageToolbarLayout = new QHBoxLayout(imageToolbar);
+    imageToolbarLayout->setContentsMargins(8, 4, 8, 4);
+    imageToolbarLayout->setSpacing(6);
+    auto* imageToolbarTitle = new QLabel(QStringLiteral("图像视图"), imageToolbar);
+    imageToolbarTitle->setObjectName(QStringLiteral("imageToolbarTitle"));
+    fitImageButton_ = new QPushButton(QStringLiteral("适应窗口"), imageToolbar);
+    fitImageButton_->setObjectName(QStringLiteral("compactButton"));
+    fitImageButton_->setToolTip(QStringLiteral("将图像恢复为适应窗口的显示比例"));
+    imageToolbarLayout->addWidget(imageToolbarTitle);
+    imageToolbarLayout->addStretch(1);
+    imageToolbarLayout->addWidget(fitImageButton_);
+    centerLayout->addWidget(imageToolbar);
+
     imageView_ = new ImageView(centerPanel);
     centerLayout->addWidget(imageView_, 1);
 
@@ -385,6 +407,9 @@ void MainWindow::buildUi() {
     });
     resultTable_->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     resultTable_->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+    resultTable_->setAlternatingRowColors(true);
+    resultTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    resultTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     resultTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
     resultTable_->horizontalHeader()->setStretchLastSection(true);
     resultTable_->setColumnWidth(0, 180);
@@ -424,10 +449,21 @@ void MainWindow::buildUi() {
         QStringLiteral("状态"), QStringLiteral("数值"), QStringLiteral("单位"), QStringLiteral("信息")});
     batchTable_->horizontalHeader()->setStretchLastSection(true);
     batchTable_->verticalHeader()->setVisible(false);
+    batchTable_->setAlternatingRowColors(true);
+    batchTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    batchTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     batchLayout->addWidget(batchTable_, 1);
     resultTabs->addTab(batchPage, QStringLiteral("批量测试"));
     batchTimer_ = new QTimer(this);
     batchTimer_->setSingleShot(true);
+
+    openImageButton_->setProperty("role", "primary");
+    startBatchButton_->setProperty("role", "primary");
+    deleteCaliperButton_->setProperty("role", "danger");
+    cancelBatchButton_->setProperty("role", "danger");
+    addCaliperButton_->setProperty("role", "tool");
+    addTemplateButton_->setProperty("role", "tool");
+    addCircleButton_->setProperty("role", "tool");
 
     splitter->setStretchFactor(0, 0);
     splitter->setStretchFactor(1, 1);
@@ -447,6 +483,7 @@ void MainWindow::connectUi() {
     connect(startBatchButton_, &QPushButton::clicked, this, &MainWindow::startBatch);
     connect(pauseBatchButton_, &QPushButton::clicked, this, &MainWindow::toggleBatchPause);
     connect(cancelBatchButton_, &QPushButton::clicked, this, &MainWindow::cancelBatch);
+    connect(fitImageButton_, &QPushButton::clicked, imageView_, &ImageView::resetView);
     connect(batchTimer_, &QTimer::timeout, this, &MainWindow::processNextBatchImage);
     connect(batchTable_, &QTableWidget::cellClicked, this, [this](int row, int) {
         if (row < 0 || row >= static_cast<int>(batchRows_.size())) {
@@ -470,7 +507,7 @@ void MainWindow::connectUi() {
         green_ = channels[1];
         red_ = channels[2];
         recomputeAll();
-        refreshAll();
+        refreshAll(true);
     });
     connect(deleteCaliperButton_, &QPushButton::clicked, this, &MainWindow::deleteCurrentCaliper);
     connect(addCaliperButton_, &QPushButton::toggled, this, [this](bool checked) {
@@ -549,11 +586,11 @@ void MainWindow::connectUi() {
 
     connect(calibrationEnabled_, &QCheckBox::toggled, this, [this](bool enabled) {
         recipe_.calibration.enabled = enabled;
-        refreshResultTable();
+        refreshAll();
     });
     connect(mmPerPixelSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double value) {
         recipe_.calibration.mmPerPixel = value;
-        refreshResultTable();
+        refreshAll();
     });
     connect(channelCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
         recipe_.defaultChannel = index == 1 ? measure::ImageChannel::Red :
@@ -594,7 +631,7 @@ bool MainWindow::loadImage(const QString& path, QString* errorMessage) {
     image_ = currentPreviewImage();
     recipe_.imagePath = toStdString(path);
     recomputeAll();
-    refreshAll();
+    refreshAll(true);
     setStatus(QStringLiteral("已加载图像：") + path);
     return true;
 }
@@ -1187,7 +1224,7 @@ void MainWindow::recomputeAll() {
     results_ = runResult_.toolResults;
 }
 
-void MainWindow::refreshAll() {
+void MainWindow::refreshAll(bool resetImageView) {
     image_ = currentPreviewImage();
     refreshToolList();
     refreshParameterPanel();
@@ -1203,7 +1240,8 @@ void MainWindow::refreshAll() {
         pendingEdgeToolId_,
         pendingEdgePosition_,
         recipe_.calibration.enabled,
-        recipe_.calibration.mmPerPixel);
+        recipe_.calibration.mmPerPixel,
+        resetImageView);
 }
 
 void MainWindow::refreshToolList() {

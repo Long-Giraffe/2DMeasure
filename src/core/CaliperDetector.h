@@ -20,8 +20,7 @@ private:
         const cv::Mat& gray,
         const cv::Point2d& p1,
         const cv::Point2d& p2,
-        int width,
-        double smoothSigma) const;
+        int width) const;
 
     std::vector<float> computeProfileGradient(
         const std::vector<float>& profile,
@@ -29,6 +28,7 @@ private:
         double sampleStep) const;
 
     std::vector<EdgePoint> findEdges(
+        const std::vector<float>& profile,
         const std::vector<float>& gradient,
         const CaliperTool& tool,
         double sampleStep) const;

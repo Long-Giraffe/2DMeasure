@@ -1,13 +1,21 @@
 #include "core/CaliperDetector.h"
 
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
 
-int main() {
-    const std::string path = "E:/Code/2dMeasure/1.png";
-    cv::Mat gray = cv::imread(path, cv::IMREAD_GRAYSCALE);
+int main(int argc, char* argv[]) {
+    const std::string path = argc > 1 ? argv[1] : std::string();
+    cv::Mat gray;
+    if (path.empty()) {
+        gray = cv::Mat(80, 240, CV_8U, cv::Scalar(255));
+        cv::rectangle(gray, cv::Rect(80, 10, 81, 60), cv::Scalar(0), cv::FILLED);
+    } else {
+        gray = cv::imread(path, cv::IMREAD_GRAYSCALE);
+    }
     if (gray.empty()) {
         std::cerr << "failed to read " << path << "\n";
         return 1;
@@ -28,7 +36,8 @@ int main() {
         }
     }
 
-    std::cout << "image=" << gray.cols << "x" << gray.rows << "\n";
+    std::cout << "image=" << gray.cols << "x" << gray.rows
+              << (path.empty() ? " synthetic" : " path=" + path) << "\n";
     std::cout << "black_bbox min=(" << minX << "," << minY << ") max=(" << maxX << "," << maxY << ")\n";
     std::cout << "bbox_boundaries left=" << (minX - 0.5)
               << " right=" << (maxX + 0.5)

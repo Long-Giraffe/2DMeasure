@@ -1,5 +1,6 @@
 #include "ui/ImageView.h"
 
+#include <QFontMetrics>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QWheelEvent>
@@ -20,6 +21,42 @@ double distancePointToSegment(QPointF p, QPointF a, QPointF b) {
     return std::hypot(p.x() - projection.x(), p.y() - projection.y());
 }
 
+void drawOverlayLabel(
+    QPainter& painter,
+    const QRect& bounds,
+    const QPointF& anchor,
+    const QString& text,
+    const QColor& background = QColor(24, 32, 40, 220),
+    const QColor& foreground = QColor(255, 255, 255)) {
+    if (text.isEmpty()) {
+        return;
+    }
+
+    const QFontMetrics metrics(painter.font());
+    const int maxTextWidth = std::max(80, std::min(320, bounds.width() - 24));
+    const QString displayText = metrics.elidedText(text, Qt::ElideRight, maxTextWidth);
+    const QSize textSize = metrics.size(Qt::TextSingleLine, displayText);
+    QRectF label(anchor, QSizeF(textSize.width() + 12.0, textSize.height() + 6.0));
+    if (label.right() > bounds.right() - 4.0) {
+        label.moveRight(bounds.right() - 4.0);
+    }
+    if (label.bottom() > bounds.bottom() - 4.0) {
+        label.moveBottom(bounds.bottom() - 4.0);
+    }
+    if (label.left() < bounds.left() + 4.0) {
+        label.moveLeft(bounds.left() + 4.0);
+    }
+    if (label.top() < bounds.top() + 4.0) {
+        label.moveTop(bounds.top() + 4.0);
+    }
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(background);
+    painter.drawRoundedRect(label, 3.0, 3.0);
+    painter.setPen(foreground);
+    painter.drawText(label.adjusted(6.0, 2.0, -6.0, -2.0), Qt::AlignCenter, displayText);
+}
+
 } // namespace
 
 ImageView::ImageView(QWidget* parent)
@@ -38,8 +75,8 @@ void ImageView::setScene(
     const std::string& pendingEdgeToolId,
     double pendingEdgePosition,
     bool calibrationEnabled,
-    double mmPerPixel) {
-    const bool imageChanged = image_.cacheKey() != image.cacheKey();
+    double mmPerPixel,
+    bool resetView) {
     image_ = image;
     tools_ = tools;
     results_ = results;
@@ -50,9 +87,9 @@ void ImageView::setScene(
     pendingEdgePosition_ = pendingEdgePosition;
     calibrationEnabled_ = calibrationEnabled;
     mmPerPixel_ = mmPerPixel;
-    if (imageChanged) {
-        zoom_ = 1.0;
-        pan_ = QPointF(0.0, 0.0);
+    if (resetView) {
+        this->resetView();
+        return;
     }
     update();
 }
@@ -66,6 +103,12 @@ void ImageView::setCreateMode(bool enabled) {
 void ImageView::setCreateMode(CreateMode mode) {
     createMode_ = mode;
     dragMode_ = DragMode::None;
+    update();
+}
+
+void ImageView::resetView() {
+    zoom_ = 1.0;
+    pan_ = QPointF(0.0, 0.0);
     update();
 }
 
@@ -93,7 +136,18 @@ void ImageView::paintEvent(QPaintEvent*) {
         const int x1 = std::min(image_.width() - 1, static_cast<int>(std::ceil(visibleBottomRight.x())));
         const int y1 = std::min(image_.height() - 1, static_cast<int>(std::ceil(visibleBottomRight.y())));
 
-        painter.setPen(QPen(QColor(255, 255, 255, 70), 1.0));
+        painter.setPen(QPen(QColor(0, 0, 0, 90), 2.0));
+        for (int x = x0; x <= x1 + 1; ++x) {
+            const double wx = imageOffset().x() + x * scale;
+            painter.drawLine(QPointF(wx, imageOffset().y() + y0 * scale),
+                             QPointF(wx, imageOffset().y() + (y1 + 1) * scale));
+        }
+        for (int y = y0; y <= y1 + 1; ++y) {
+            const double wy = imageOffset().y() + y * scale;
+            painter.drawLine(QPointF(imageOffset().x() + x0 * scale, wy),
+                             QPointF(imageOffset().x() + (x1 + 1) * scale, wy));
+        }
+        painter.setPen(QPen(QColor(255, 255, 255, 90), 1.0));
         for (int x = x0; x <= x1 + 1; ++x) {
             const double wx = imageOffset().x() + x * scale;
             painter.drawLine(QPointF(wx, imageOffset().y() + y0 * scale),
@@ -106,7 +160,6 @@ void ImageView::paintEvent(QPaintEvent*) {
         }
 
         if (scale >= 24.0) {
-            painter.setPen(QColor(255, 255, 255, 210));
             for (int y = y0; y <= y1; ++y) {
                 for (int x = x0; x <= x1; ++x) {
                     const int value = qGray(image_.pixel(x, y));
@@ -115,6 +168,7 @@ void ImageView::paintEvent(QPaintEvent*) {
                         imageOffset().y() + y * scale,
                         scale,
                         scale);
+                    painter.setPen(value >= 144 ? QColor(15, 23, 32, 230) : QColor(255, 255, 255, 230));
                     painter.drawText(cell, Qt::AlignCenter, QString::number(value));
                 }
             }
@@ -177,13 +231,27 @@ void ImageView::paintEvent(QPaintEvent*) {
                     painter.setBrush(Qt::NoBrush);
                     painter.setPen(QPen(QColor(255, 255, 255), 2.0, Qt::DashLine));
                     painter.drawEllipse(fc, result.fittedRadius * scale, result.fittedRadius * scale);
-                    const QString radiusText = calibrationEnabled_
-                        ? QStringLiteral("R=%1 px / %2 mm")
-                            .arg(QString::number(result.fittedRadius, 'f', 3))
-                            .arg(QString::number(result.fittedRadius * mmPerPixel_, 'f', 6))
-                        : QStringLiteral("R=%1 px").arg(QString::number(result.fittedRadius, 'f', 3));
-                    painter.setPen(QColor(255, 255, 255));
-                    painter.drawText(fc + QPointF(result.fittedRadius * scale + 6.0, -6.0), radiusText);
+                    const QString diameterText = calibrationEnabled_
+                        ? QStringLiteral("%1  D=%2 px / %3 mm")
+                            .arg(QString::fromStdString(tool.name))
+                            .arg(QString::number(result.fittedDiameter, 'f', 3))
+                            .arg(QString::number(result.fittedDiameter * mmPerPixel_, 'f', 6))
+                        : QStringLiteral("%1  D=%2 px")
+                            .arg(QString::fromStdString(tool.name))
+                            .arg(QString::number(result.fittedDiameter, 'f', 3));
+                    drawOverlayLabel(
+                        painter,
+                        rect(),
+                        fc + QPointF(result.fittedRadius * scale + 8.0, -12.0),
+                        diameterText,
+                        QColor(20, 94, 142, 225));
+                } else {
+                    drawOverlayLabel(
+                        painter,
+                        rect(),
+                        center + QPointF(tool.outerRadius * scale + 8.0, -12.0),
+                        QStringLiteral("%1  NG").arg(QString::fromStdString(tool.name)),
+                        QColor(180, 45, 45, 225));
                 }
             }
             continue;
@@ -245,6 +313,35 @@ void ImageView::paintEvent(QPaintEvent*) {
                     painter.drawText(badge, Qt::AlignCenter, label);
                 }
             }
+
+            if (result.ok) {
+                const auto* selectedEdge = result.selectedEdge();
+                if (!selectedEdge) {
+                    continue;
+                }
+                const QPointF ep = imageToWidget(selectedEdge->point);
+                const QString edgeText = calibrationEnabled_
+                    ? QStringLiteral("%1  P=%2 px / %3 mm")
+                        .arg(QString::fromStdString(tool.name))
+                        .arg(QString::number(selectedEdge->position, 'f', 3))
+                        .arg(QString::number(selectedEdge->position * mmPerPixel_, 'f', 6))
+                    : QStringLiteral("%1  P=%2 px")
+                        .arg(QString::fromStdString(tool.name))
+                        .arg(QString::number(selectedEdge->position, 'f', 3));
+                drawOverlayLabel(
+                    painter,
+                    rect(),
+                    ep + QPointF(10.0, -34.0),
+                    edgeText,
+                    QColor(20, 94, 142, 225));
+            } else {
+                drawOverlayLabel(
+                    painter,
+                    rect(),
+                    (p1 + p2) * 0.5 + QPointF(8.0, -28.0),
+                    QStringLiteral("%1  NG").arg(QString::fromStdString(tool.name)),
+                    QColor(180, 45, 45, 225));
+            }
         }
     }
 
@@ -286,7 +383,12 @@ void ImageView::paintEvent(QPaintEvent*) {
                 .arg(QString::number(distancePx, 'f', 3))
                 .arg(QString::number(distancePx * mmPerPixel_, 'f', 6))
             : QStringLiteral("%1 px").arg(QString::number(distancePx, 'f', 3));
-        painter.drawText((a + b) * 0.5 + QPointF(6.0, -6.0), text);
+        drawOverlayLabel(
+            painter,
+            rect(),
+            (a + b) * 0.5 + QPointF(6.0, -24.0),
+            text,
+            QColor(48, 58, 68, 225));
     }
 
     if (hasMouseImagePoint_) {

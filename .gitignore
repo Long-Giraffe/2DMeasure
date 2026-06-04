@@ -1,4 +1,6 @@
 build/
+x64/
+validation_output/
 .vs/
 .vscode/
 *.user
@@ -15,3 +17,8 @@ build/
 *.tlog
 *.recipe
 *.log
+
+# Generated validation reports
+caliper_modification_report.md
+caliper_validation_report.md
+caliper_validation_results.csv

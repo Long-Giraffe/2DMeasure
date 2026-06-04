@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <numeric>
 #include <random>
 
@@ -149,6 +150,91 @@ double fitQuadraticSubpixel(const std::vector<float>& x, const std::vector<float
 
     double peak = -qb / (2.0 * qa) + xMean;
     return std::clamp(peak, static_cast<double>(x.front()), static_cast<double>(x.back()));
+}
+
+bool refineProfileMidpointCrossing(
+    const std::vector<float>& profile,
+    int segmentStart,
+    int segmentEnd,
+    int polarity,
+    double peakIndex,
+    double* refinedIndex) {
+    const int n = static_cast<int>(profile.size());
+    if (!refinedIndex || n < 2 || segmentStart <= 0 || segmentEnd >= n - 1) {
+        return false;
+    }
+
+    constexpr int shoulderSamples = 4;
+    const int leftBegin = std::max(0, segmentStart - shoulderSamples);
+    const int leftEnd = segmentStart - 1;
+    const int rightBegin = segmentEnd + 1;
+    const int rightEnd = std::min(n - 1, segmentEnd + shoulderSamples);
+    if (leftBegin > leftEnd || rightBegin > rightEnd) {
+        return false;
+    }
+
+    auto average = [&](int begin, int end) {
+        double sum = 0.0;
+        for (int i = begin; i <= end; ++i) {
+            sum += profile[static_cast<size_t>(i)];
+        }
+        return sum / static_cast<double>(end - begin + 1);
+    };
+
+    const double leftLevel = average(leftBegin, leftEnd);
+    const double rightLevel = average(rightBegin, rightEnd);
+    const double contrast = rightLevel - leftLevel;
+    const double contrastMagnitude = std::abs(contrast);
+    if (contrastMagnitude < 1.0 ||
+        (polarity > 0 && contrast <= 0.0) ||
+        (polarity < 0 && contrast >= 0.0)) {
+        return false;
+    }
+
+    auto maxDeviation = [&](int begin, int end, double level) {
+        double deviation = 0.0;
+        for (int i = begin; i <= end; ++i) {
+            deviation = std::max(deviation, std::abs(profile[static_cast<size_t>(i)] - level));
+        }
+        return deviation;
+    };
+    const double stabilityLimit = std::max(1.0, contrastMagnitude * 0.08);
+    if (maxDeviation(leftBegin, leftEnd, leftLevel) > stabilityLimit ||
+        maxDeviation(rightBegin, rightEnd, rightLevel) > stabilityLimit) {
+        return false;
+    }
+
+    const double midpoint = 0.5 * (leftLevel + rightLevel);
+    const int searchBegin = std::max(0, segmentStart - 1);
+    const int searchEnd = std::min(n - 2, segmentEnd + 1);
+    bool found = false;
+    double bestIndex = peakIndex;
+    double bestDistance = std::numeric_limits<double>::max();
+
+    for (int i = searchBegin; i <= searchEnd; ++i) {
+        const double v0 = profile[static_cast<size_t>(i)];
+        const double v1 = profile[static_cast<size_t>(i + 1)];
+        const bool crosses = polarity > 0
+            ? (v0 <= midpoint && v1 >= midpoint)
+            : (v0 >= midpoint && v1 <= midpoint);
+        if (!crosses || std::abs(v1 - v0) < 1e-9) {
+            continue;
+        }
+
+        const double fraction = std::clamp((midpoint - v0) / (v1 - v0), 0.0, 1.0);
+        const double crossingIndex = static_cast<double>(i) + fraction;
+        const double distance = std::abs(crossingIndex - peakIndex);
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = crossingIndex;
+            found = true;
+        }
+    }
+
+    if (found) {
+        *refinedIndex = bestIndex;
+    }
+    return found;
 }
 
 bool passesThreshold(double value, const CaliperTool& tool) {
@@ -436,9 +522,17 @@ CaliperResult CaliperDetector::detectLine(const cv::Mat& gray, const CaliperTool
 
     result.profileStartPosition = -padding;
     result.profileSampleStep = sampleStep;
-    result.profile = extractProfileAlongLine(gray, extP1, extP2, tool.width, tool.profileSmoothSigma);
+    // Use the smoothed profile to find stable edge candidates, but refine a
+    // clean step edge against the raw profile so a 255-to-0 boundary lands at .5.
+    const auto rawProfile = extractProfileAlongLine(gray, extP1, extP2, tool.width);
+    result.profile = rawProfile;
+    if (tool.profileSmoothSigma > 0.0) {
+        result.profile = convolve1DReplicate(
+            result.profile,
+            makeGaussianKernel(tool.profileSmoothSigma / sampleStep));
+    }
     result.gradient = computeProfileGradient(result.profile, tool.derivativeSigma, sampleStep);
-    auto rawEdges = findEdges(result.gradient, tool, sampleStep);
+    auto rawEdges = findEdges(rawProfile, result.gradient, tool, sampleStep);
 
     for (auto edge : rawEdges) {
         edge.position -= padding;
@@ -606,8 +700,7 @@ std::vector<float> CaliperDetector::extractProfileAlongLine(
     const cv::Mat& gray,
     const cv::Point2d& p1,
     const cv::Point2d& p2,
-    int width,
-    double smoothSigma) const {
+    int width) const {
     const cv::Point2d axis = p2 - p1;
     const double lineLength = std::hypot(axis.x, axis.y);
     if (lineLength < 1e-6) {
@@ -635,9 +728,6 @@ std::vector<float> CaliperDetector::extractProfileAlongLine(
         profile.push_back(static_cast<float>(sum / acrossSamples));
     }
 
-    if (smoothSigma > 0.0) {
-        profile = convolve1DReplicate(profile, makeGaussianKernel(smoothSigma / lineStep));
-    }
     return profile;
 }
 
@@ -659,6 +749,7 @@ std::vector<float> CaliperDetector::computeProfileGradient(
 }
 
 std::vector<EdgePoint> CaliperDetector::findEdges(
+    const std::vector<float>& profile,
     const std::vector<float>& gradient,
     const CaliperTool& tool,
     double sampleStep) const {
@@ -681,18 +772,22 @@ std::vector<EdgePoint> CaliperDetector::findEdges(
             }
         }
 
+        const int polarity = peakValue > 0.0 ? +1 : -1;
         std::vector<float> x;
         std::vector<float> y;
         for (int i = peakIndex - 2; i <= peakIndex + 2; ++i) {
             if (i >= 0 && i < n) {
                 x.push_back(static_cast<float>(i));
-                y.push_back(gradient[static_cast<size_t>(i)]);
+                y.push_back(static_cast<float>(polarity * gradient[static_cast<size_t>(i)]));
             }
         }
 
+        double subpixelIndex = fitQuadraticSubpixel(x, y);
+        refineProfileMidpointCrossing(profile, start, end, polarity, subpixelIndex, &subpixelIndex);
+
         EdgePoint edge;
-        edge.position = fitQuadraticSubpixel(x, y) * sampleStep;
-        edge.polarity = peakValue > 0.0 ? +1 : -1;
+        edge.position = subpixelIndex * sampleStep;
+        edge.polarity = polarity;
         edge.gradient = peakValue;
         edges.push_back(edge);
     };

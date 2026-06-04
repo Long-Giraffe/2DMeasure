@@ -32,9 +32,11 @@ public:
         const std::string& pendingEdgeToolId,
         double pendingEdgePosition,
         bool calibrationEnabled,
-        double mmPerPixel);
+        double mmPerPixel,
+        bool resetView);
     void setCreateMode(bool enabled);
     void setCreateMode(CreateMode mode);
+    void resetView();
 
 signals:
     void caliperCreated(QPointF p1, QPointF p2);
